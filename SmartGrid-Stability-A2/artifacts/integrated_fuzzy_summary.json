@@ -1,0 +1,11 @@
+{
+    "total_testing_data": 1500,
+    "average_probability": 0.6332044005393982,
+    "average_model_agreement": 0.963888888888889,
+    "average_fuzzy_risk": 59.43973036676181,
+    "risk_distribution": {
+        "Risiko Tinggi": 900,
+        "Risiko Rendah": 499,
+        "Risiko Sedang": 101
+    }
+}

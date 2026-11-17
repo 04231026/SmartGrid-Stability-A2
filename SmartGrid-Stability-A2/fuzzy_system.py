@@ -1,57 +1,232 @@
-"""Fuzzy Mamdani untuk interpretasi risiko kestabilan jaringan."""
+
 import numpy as np
+import skfuzzy as fuzz
+from skfuzzy import control as ctrl
 
-INPUTS = {
- "p_unstable":{"universe":(0.,1.),"sets":{
-  "Low":(0.,0.,.20,.40),"Medium":(.25,.45,.55,.75),
-  "High":(.60,.75,.85,.95),"VeryHigh":(.85,.95,1.,1.)}},
- "stress":{"universe":(0.,1.),"sets":{
-  "Low":(0.,0.,.25,.50),"Medium":(.25,.45,.55,.75),"High":(.50,.75,1.,1.)}}
-}
-OUTPUT = {"universe":(0.,100.),"sets":{
- "Secure":(0.,0.,15.,30.),"Alert":(20.,35.,45.,60.),
- "Unstable":(50.,65.,75.,88.),"Critical":(80.,90.,100.,100.)}}
-RULES = [
- ({"p_unstable":"Low","stress":"Low"},"Secure"),
- ({"p_unstable":"Low","stress":"Medium"},"Secure"),
- ({"p_unstable":"Low","stress":"High"},"Alert"),
- ({"p_unstable":"Medium","stress":"Low"},"Alert"),
- ({"p_unstable":"Medium","stress":"Medium"},"Alert"),
- ({"p_unstable":"Medium","stress":"High"},"Unstable"),
- ({"p_unstable":"High","stress":"Low"},"Unstable"),
- ({"p_unstable":"High","stress":"Medium"},"Unstable"),
- ({"p_unstable":"High","stress":"High"},"Critical"),
- ({"p_unstable":"VeryHigh","stress":"Low"},"Critical"),
- ({"p_unstable":"VeryHigh","stress":"Medium"},"Critical"),
- ({"p_unstable":"VeryHigh","stress":"High"},"Critical")]
-RECOMMENDATION = {
- "Secure":"Jaringan diperkirakan stabil. Lanjutkan operasi dan monitoring rutin.",
- "Alert":"Terdapat indikasi risiko. Tingkatkan pemantauan kondisi jaringan.",
- "Unstable":"Jaringan berpotensi tidak stabil. Evaluasi parameter operasi dan siapkan mitigasi.",
- "Critical":"Risiko sangat tinggi. Prioritaskan tindakan mitigasi dan evaluasi beban jaringan."}
 
-def trapmf(x,a,b,c,d):
-    x=np.asarray(x,dtype=float)
-    left=np.ones_like(x) if a==b else np.clip((x-a)/(b-a),0,1)
-    right=np.ones_like(x) if c==d else np.clip((d-x)/(d-c),0,1)
-    return np.minimum(left,right)
+# =====================================================
+# 1. MEMBUAT VARIABEL FUZZY
+# =====================================================
 
-def stress_index(tau_mean,g_mean):
-    t=np.clip((float(tau_mean)-.5)/9.5,0,1)
-    g=np.clip((float(g_mean)-.05)/.95,0,1)
-    return float(.5*t+.5*g)
+probabilitas = ctrl.Antecedent(
+    np.arange(0, 1.01, 0.01),
+    "probabilitas"
+)
 
-def infer(p_unstable,stress):
-    p=float(np.clip(p_unstable,0,1)); s=float(np.clip(stress,0,1))
-    universe=np.linspace(*OUTPUT["universe"],1001)
-    agg=np.zeros_like(universe)
-    for antecedent, consequent in RULES:
-        vals={"p_unstable":p,"stress":s}
-        strength=min(float(trapmf(vals[k],*INPUTS[k]["sets"][v])) for k,v in antecedent.items())
-        mf=trapmf(universe,*OUTPUT["sets"][consequent])
-        agg=np.maximum(agg,np.minimum(strength,mf))
-    area=agg.sum()
-    score=float((universe*agg).sum()/area) if area else 50.
-    category=max(OUTPUT["sets"],key=lambda k:float(trapmf(score,*OUTPUT["sets"][k])))
-    return {"score":score,"category":category,"universe":universe,"aggregated":agg,
-            "recommendation":RECOMMENDATION[category]}
+kesepakatan = ctrl.Antecedent(
+    np.arange(0, 1.01, 0.01),
+    "kesepakatan"
+)
+
+risiko = ctrl.Consequent(
+    np.arange(0, 101, 1),
+    "risiko"
+)
+
+
+# =====================================================
+# 2. MEMBERSHIP FUNCTION INPUT 1
+# =====================================================
+
+probabilitas["rendah"] = fuzz.trapmf(
+    probabilitas.universe,
+    [0, 0, 0.15, 0.35]
+)
+
+probabilitas["sedang"] = fuzz.trimf(
+    probabilitas.universe,
+    [0.20, 0.50, 0.80]
+)
+
+probabilitas["tinggi"] = fuzz.trapmf(
+    probabilitas.universe,
+    [0.65, 0.85, 1, 1]
+)
+
+
+# =====================================================
+# 3. MEMBERSHIP FUNCTION INPUT 2
+# =====================================================
+
+kesepakatan["rendah"] = fuzz.trapmf(
+    kesepakatan.universe,
+    [0, 0, 0.20, 0.45]
+)
+
+kesepakatan["sedang"] = fuzz.trimf(
+    kesepakatan.universe,
+    [0.25, 0.50, 0.75]
+)
+
+kesepakatan["tinggi"] = fuzz.trapmf(
+    kesepakatan.universe,
+    [0.55, 0.80, 1, 1]
+)
+
+
+# =====================================================
+# 4. MEMBERSHIP FUNCTION OUTPUT
+# =====================================================
+
+risiko["rendah"] = fuzz.trapmf(
+    risiko.universe,
+    [0, 0, 20, 45]
+)
+
+risiko["sedang"] = fuzz.trimf(
+    risiko.universe,
+    [30, 50, 70]
+)
+
+risiko["tinggi"] = fuzz.trapmf(
+    risiko.universe,
+    [55, 80, 100, 100]
+)
+
+
+# =====================================================
+# 5. FUZZY RULE BASE
+# =====================================================
+
+rule1 = ctrl.Rule(
+    probabilitas["rendah"] & kesepakatan["rendah"],
+    risiko["sedang"]
+)
+
+rule2 = ctrl.Rule(
+    probabilitas["rendah"] & kesepakatan["sedang"],
+    risiko["rendah"]
+)
+
+rule3 = ctrl.Rule(
+    probabilitas["rendah"] & kesepakatan["tinggi"],
+    risiko["rendah"]
+)
+
+rule4 = ctrl.Rule(
+    probabilitas["sedang"] & kesepakatan["rendah"],
+    risiko["tinggi"]
+)
+
+rule5 = ctrl.Rule(
+    probabilitas["sedang"] & kesepakatan["sedang"],
+    risiko["sedang"]
+)
+
+rule6 = ctrl.Rule(
+    probabilitas["sedang"] & kesepakatan["tinggi"],
+    risiko["sedang"]
+)
+
+rule7 = ctrl.Rule(
+    probabilitas["tinggi"] & kesepakatan["rendah"],
+    risiko["tinggi"]
+)
+
+rule8 = ctrl.Rule(
+    probabilitas["tinggi"] & kesepakatan["sedang"],
+    risiko["tinggi"]
+)
+
+rule9 = ctrl.Rule(
+    probabilitas["tinggi"] & kesepakatan["tinggi"],
+    risiko["tinggi"]
+)
+
+
+# =====================================================
+# 6. MEMBANGUN SISTEM MAMDANI
+# =====================================================
+
+risk_control = ctrl.ControlSystem([
+    rule1, rule2, rule3,
+    rule4, rule5, rule6,
+    rule7, rule8, rule9
+])
+
+
+# =====================================================
+# 7. FUNGSI PREDIKSI FUZZY
+# =====================================================
+
+def fuzzy_prediction(probability, agreement):
+
+    simulation = ctrl.ControlSystemSimulation(
+        risk_control
+    )
+
+    simulation.input["probabilitas"] = float(
+        np.clip(probability, 0, 1)
+    )
+
+    simulation.input["kesepakatan"] = float(
+        np.clip(agreement, 0, 1)
+    )
+
+    simulation.compute()
+
+    risk_value = simulation.output["risiko"]
+
+    if risk_value < 40:
+        category = "Risiko Rendah"
+
+    elif risk_value < 70:
+        category = "Risiko Sedang"
+
+    else:
+        category = "Risiko Tinggi"
+
+    return {
+        "probabilitas": float(probability),
+        "kesepakatan": float(agreement),
+        "risk_score": float(risk_value),
+        "category": category
+    }
+
+
+# =====================================================
+# 8. PENGUJIAN BEBERAPA SKENARIO
+# =====================================================
+
+if __name__ == "__main__":
+
+    scenarios = [
+        (0.10, 0.90),
+        (0.45, 0.80),
+        (0.85, 0.95),
+        (0.80, 0.30),
+        (0.50, 0.50)
+    ]
+
+    print("=" * 55)
+    print("PENGUJIAN FUZZY LOGIC MAMDANI")
+    print("=" * 55)
+
+    for index, (prob, agree) in enumerate(
+        scenarios, start=1
+    ):
+
+        result = fuzzy_prediction(prob, agree)
+
+        print(f"\nSkenario {index}")
+        print(
+            f"Probabilitas tidak stabil: "
+            f"{prob:.2f}"
+        )
+
+        print(
+            f"Kesepakatan model: "
+            f"{agree:.2f}"
+        )
+
+        print(
+            f"Skor risiko: "
+            f"{result['risk_score']:.2f}"
+        )
+
+        print(
+            f"Keputusan: "
+            f"{result['category']}"
+        )
+
+    print("\nPengujian Fuzzy selesai.")

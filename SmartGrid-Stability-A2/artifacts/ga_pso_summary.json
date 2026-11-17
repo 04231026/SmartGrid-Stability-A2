@@ -1,0 +1,24 @@
+{
+    "model": "GA + PSO + Neural Network",
+    "selected_features": [
+        "tau1",
+        "tau2",
+        "tau3",
+        "tau4",
+        "g1",
+        "g2",
+        "g3",
+        "g4"
+    ],
+    "number_of_features": 8,
+    "best_fitness": 0.9831756046267087,
+    "best_parameters": {
+        "neurons_1": 80,
+        "neurons_2": 48,
+        "learning_rate": 0.0006194206679711154,
+        "dropout": 0.1
+    },
+    "population_size": 8,
+    "generations": 8,
+    "seed": 42
+}

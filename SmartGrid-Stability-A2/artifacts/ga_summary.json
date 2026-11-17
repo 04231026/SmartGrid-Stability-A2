@@ -1,0 +1,18 @@
+{
+    "best_fitness": 0.9132711249351996,
+    "selected_features": [
+        "tau1",
+        "tau2",
+        "tau3",
+        "tau4",
+        "g1",
+        "g2",
+        "g3",
+        "g4"
+    ],
+    "number_of_selected_features": 8,
+    "number_of_original_features": 12,
+    "generations": 10,
+    "population_size": 10,
+    "seed": 42
+}

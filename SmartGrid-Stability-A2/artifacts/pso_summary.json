@@ -1,0 +1,13 @@
+{
+    "model": "PSO + Neural Network",
+    "best_fitness": 0.9817613340281397,
+    "best_parameters": {
+        "neurons_1": 72,
+        "neurons_2": 32,
+        "learning_rate": 0.0016966584524292945,
+        "dropout": 0.12704364900643078
+    },
+    "population_size": 8,
+    "generations": 8,
+    "seed": 42
+}
